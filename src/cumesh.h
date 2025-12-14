@@ -18,6 +18,7 @@ public:
     Buffer<int3> faces;
 
     // Geometric properties
+    Buffer<float> face_areas;
     Buffer<float3> face_normals;
     Buffer<float3> vertex_normals;
 
@@ -68,6 +69,9 @@ public:
 
     Buffer<float4> atlas_chart_normal_cones;
     Buffer<uint64_t> atlas_chart_adj;
+    Buffer<float> atlas_chart_adj_length;
+    Buffer<float> atlas_chart_perims;
+    Buffer<float> atlas_chart_areas;
     Buffer<int> atlas_chart2edge;
     Buffer<int> atlas_chart2edge_cnt;
     Buffer<int> atlas_chart2edge_offset;
@@ -184,6 +188,13 @@ public:
     
 
     // Geometric functions
+
+    /**
+     * Compute face areas.
+     * This function refreshes:
+     * - face_areas
+     */
+    void compute_face_areas();
 
     /**
      * Compute face normals.
@@ -428,7 +439,7 @@ public:
 
     // Atlasing functions
 
-    /**
+   /**
      * Compute charts for atlasing.
      * This function requires:
      * - manifold_face_adj
@@ -438,24 +449,25 @@ public:
      * - atlas_chart_faces
      * - atlas_chart_faces_offset
      *
-     * @param threshold_cone_half_angle_rad The threshold for the cone half angle in radians.
-     * @param refine_iterations The number of refinement iterations.
-     * @param global_iterations The number of global iterations.
-     * @param smooth_strength The strength of the smoothing.
+     *  @param  threshold_cone_half_angle_rad The threshold for the cone half angle in radians.
+     *  @param  refine_iterations             The number of refinement iterations.
+     *  @param  global_iterations             The number of global iterations.
+     *  @param  smooth_strength               The strength of the smoothing.
+     *  @param  area_penalty_weight           Coefficient for chart size penalty. Cost += Area * weight.
+     *                                        Prevents charts from becoming too large if > 0, 
+     *                                        or encourages larger charts if < 0 (though usually used to penalize size variance).
+     *  @param  perimeter_area_ratio_weight   Coefficient for shape irregularity (long-strip) penalty. 
+     *                                        Cost += (Perimeter / Area) * weight.
+     *                                        Higher values penalize long strips and encourage circular/compact shapes.
      */
-    void compute_charts(float threshold_cone_half_angle_rad, int refine_iterations, int global_iterations, float smooth_strength);
-
-    /**
-     * Parameterize each chart.
-     * This function requires:
-     * - atlas_chart_vertex_map
-     * - atlas_chart_faces
-     * - atlas_chart_faces_offset
-     * This function refreshes:
-     * - atlas_chart_uvs
-     */
-    void parameterize_charts();
-
+    void compute_charts(
+        float threshold_cone_half_angle_rad, 
+        int refine_iterations, 
+        int global_iterations, 
+        float smooth_strength,
+        float area_penalty_weight,
+        float perimeter_area_ratio_weight
+    );
 
     /**
      * Read the atlas charts.

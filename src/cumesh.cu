@@ -8,6 +8,7 @@ CuMesh::CuMesh() {}
 CuMesh::~CuMesh() {
     vertices.free();
     faces.free();
+    face_areas.free();
     face_normals.free();
     vertex_normals.free();
     edges.free();
@@ -47,6 +48,9 @@ CuMesh::~CuMesh() {
 
     atlas_chart_normal_cones.free();
     atlas_chart_adj.free();
+    atlas_chart_adj_length.free();
+    atlas_chart_perims.free();
+    atlas_chart_areas.free();
     atlas_chart2edge.free();
     atlas_chart2edge_cnt.free();
     atlas_chart2edge_offset.free();
@@ -84,6 +88,7 @@ int CuMesh::num_boundary_loops() const {
 }
 
 void CuMesh::clear_cache() {
+    face_areas.free();
     face_normals.free();
     vertex_normals.free();
     edges.free();

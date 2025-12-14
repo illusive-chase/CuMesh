@@ -337,7 +337,9 @@ class CuMesh:
         threshold_cone_half_angle_rad: float=math.radians(90),
         refine_iterations: int=100,
         global_iterations: int=3,
-        smooth_strength: float=1
+        smooth_strength: float=1,
+        area_penalty_weight: float=0.1,
+        perimeter_area_ratio_weight: float=0.0001,
     ):
         """
         Compute the atlas charts.
@@ -346,8 +348,21 @@ class CuMesh:
             threshold_cone_half_angle_rad: The threshold for the cone half angle in radians.
             refine_iterations: The number of refinement iterations.
             smooth_strength: The strength of chart boundary smoothing.
+            area_penalty_weight: Coefficient for chart size penalty. Cost += Area * weight.
+                                 Prevents charts from becoming too large if > 0, 
+                                 or encourages larger charts if < 0 (though usually used to penalize size variance).
+            perimeter_area_ratio_weight: Coefficient for shape irregularity (long-strip) penalty. 
+                                         Cost += (Perimeter / Area) * weight.
+                                         Higher values penalize long strips and encourage circular/compact shapes.
         """
-        self.cu_mesh.compute_charts(threshold_cone_half_angle_rad, refine_iterations, global_iterations, smooth_strength)
+        self.cu_mesh.compute_charts(
+            threshold_cone_half_angle_rad,
+            refine_iterations,
+            global_iterations,
+            smooth_strength,
+            area_penalty_weight,
+            perimeter_area_ratio_weight
+        )
         
     def read_atlas_charts(self) -> Tuple[int, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
