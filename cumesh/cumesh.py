@@ -1,9 +1,11 @@
-from typing import *
 import math
+from typing import *
+
 import torch
 from tqdm import tqdm
-from .xatlas import Atlas
+
 from . import _C
+from .xatlas import Atlas
 
 
 class CuMesh:
@@ -265,7 +267,37 @@ class CuMesh:
         """
         Remove duplicate faces from the mesh.
         """
-        self.cu_mesh.remove_duplicate_faces()
+        # manually remove duplicate faces for cudatoolkits < 12.4
+        # self.cu_mesh.remove_duplicate_faces()
+
+        _, faces = self.read() # [F, 3]
+        if faces.shape[0] == 0:
+            return
+
+        # Find unique faces and mapping
+        unique_faces, inverse_indices = faces.unique(dim=0, return_inverse=True)
+        
+        # Calculate mask of faces to keep (first occurrence)
+        num_unique = unique_faces.shape[0]
+        num_faces = faces.shape[0]
+        
+        # We want to find the first index for each unique face.
+        # first_occurrences[u] will store the min index i such that inverse_indices[i] == u
+        first_occurrences = torch.full((num_unique,), num_faces, device=faces.device, dtype=torch.long)
+        indices = torch.arange(num_faces, device=faces.device, dtype=torch.long)
+        
+        # scatter_reduce_ with "min" to find the first occurrence index for each unique face
+        first_occurrences.scatter_reduce_(0, inverse_indices, indices, reduce="min", include_self=False)
+        
+        # Create boolean mask
+        keep_mask = torch.zeros(num_faces, dtype=torch.bool, device=faces.device)
+        keep_mask[first_occurrences] = True
+        
+        # We want to remove faces that are NOT kept
+        remove_mask = ~keep_mask
+        
+        if remove_mask.any():
+            self.remove_faces(remove_mask)
         
     def remove_degenerate_faces(self, abs_thresh: float=1e-24, rel_thresh: float=1e-12):
         """
