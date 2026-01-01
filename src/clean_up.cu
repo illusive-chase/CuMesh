@@ -227,90 +227,91 @@ static __global__ void select_first_in_each_group_kernel(
 }
 
 
-struct int3_decomposer
-{
-    __host__ __device__ ::cuda::std::tuple<int&, int&, int&> operator()(int3& key) const
-    {
-        return {key.x, key.y, key.z};
-    }
-};
+// struct int3_decomposer
+// {
+//     __host__ __device__ ::cuda::std::tuple<int&, int&, int&> operator()(int3& key) const
+//     {
+//         return {key.x, key.y, key.z};
+//     }
+// };
 
 
 void CuMesh::remove_duplicate_faces() {
-    size_t F = this->faces.size;
+    // skip for CUDA toolkits < 12.4
+    // size_t F = this->faces.size;
 
-    // Create a temporary sorted copy of faces for duplicate detection
-    // Do NOT modify the original faces to preserve vertex order and normals
-    int3 *cu_sorted_faces;
-    CUDA_CHECK(cudaMalloc(&cu_sorted_faces, F * sizeof(int3)));
-    CUDA_CHECK(cudaMemcpy(cu_sorted_faces, this->faces.ptr, F * sizeof(int3), cudaMemcpyDeviceToDevice));
+    // // Create a temporary sorted copy of faces for duplicate detection
+    // // Do NOT modify the original faces to preserve vertex order and normals
+    // int3 *cu_sorted_faces;
+    // CUDA_CHECK(cudaMalloc(&cu_sorted_faces, F * sizeof(int3)));
+    // CUDA_CHECK(cudaMemcpy(cu_sorted_faces, this->faces.ptr, F * sizeof(int3), cudaMemcpyDeviceToDevice));
 
-    // Sort vertices within each face (in the temporary copy)
-    sort_faces_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
-        cu_sorted_faces,
-        F
-    );
-    CUDA_CHECK(cudaGetLastError());
+    // // Sort vertices within each face (in the temporary copy)
+    // sort_faces_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
+    //     cu_sorted_faces,
+    //     F
+    // );
+    // CUDA_CHECK(cudaGetLastError());
 
-    // Sort all faces globally by their sorted vertex indices
-    size_t temp_storage_bytes = 0;
-    int *cu_sorted_face_indices;
-    CUDA_CHECK(cudaMalloc(&cu_sorted_face_indices, F * sizeof(int)));
-    arange_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(cu_sorted_face_indices, F);
-    CUDA_CHECK(cudaGetLastError());
+    // // Sort all faces globally by their sorted vertex indices
+    // size_t temp_storage_bytes = 0;
+    // int *cu_sorted_face_indices;
+    // CUDA_CHECK(cudaMalloc(&cu_sorted_face_indices, F * sizeof(int)));
+    // arange_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(cu_sorted_face_indices, F);
+    // CUDA_CHECK(cudaGetLastError());
 
-    int *cu_sorted_indices_output;
-    int3 *cu_sorted_faces_output;
-    CUDA_CHECK(cudaMalloc(&cu_sorted_indices_output, F * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&cu_sorted_faces_output, F * sizeof(int3)));
+    // int *cu_sorted_indices_output;
+    // int3 *cu_sorted_faces_output;
+    // CUDA_CHECK(cudaMalloc(&cu_sorted_indices_output, F * sizeof(int)));
+    // CUDA_CHECK(cudaMalloc(&cu_sorted_faces_output, F * sizeof(int3)));
 
-    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
-        nullptr, temp_storage_bytes,
-        cu_sorted_faces, cu_sorted_faces_output,
-        cu_sorted_face_indices, cu_sorted_indices_output,
-        F,
-        int3_decomposer{}
-    ));
-    this->cub_temp_storage.resize(temp_storage_bytes);
-    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
-        this->cub_temp_storage.ptr, temp_storage_bytes,
-        cu_sorted_faces, cu_sorted_faces_output,
-        cu_sorted_face_indices, cu_sorted_indices_output,
-        F,
-        int3_decomposer{}
-    ));
-    CUDA_CHECK(cudaFree(cu_sorted_faces));
-    CUDA_CHECK(cudaFree(cu_sorted_face_indices));
+    // CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+    //     nullptr, temp_storage_bytes,
+    //     cu_sorted_faces, cu_sorted_faces_output,
+    //     cu_sorted_face_indices, cu_sorted_indices_output,
+    //     F,
+    //     int3_decomposer{}
+    // ));
+    // this->cub_temp_storage.resize(temp_storage_bytes);
+    // CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
+    //     this->cub_temp_storage.ptr, temp_storage_bytes,
+    //     cu_sorted_faces, cu_sorted_faces_output,
+    //     cu_sorted_face_indices, cu_sorted_indices_output,
+    //     F,
+    //     int3_decomposer{}
+    // ));
+    // CUDA_CHECK(cudaFree(cu_sorted_faces));
+    // CUDA_CHECK(cudaFree(cu_sorted_face_indices));
 
-    // Select first in each group of duplicate faces (based on sorted faces)
-    uint8_t* cu_face_mask_sorted;
-    CUDA_CHECK(cudaMalloc(&cu_face_mask_sorted, F * sizeof(uint8_t)));
-    select_first_in_each_group_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
-        cu_sorted_faces_output,
-        F,
-        cu_face_mask_sorted
-    );
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaFree(cu_sorted_faces_output));
+    // // Select first in each group of duplicate faces (based on sorted faces)
+    // uint8_t* cu_face_mask_sorted;
+    // CUDA_CHECK(cudaMalloc(&cu_face_mask_sorted, F * sizeof(uint8_t)));
+    // select_first_in_each_group_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
+    //     cu_sorted_faces_output,
+    //     F,
+    //     cu_face_mask_sorted
+    // );
+    // CUDA_CHECK(cudaGetLastError());
+    // CUDA_CHECK(cudaFree(cu_sorted_faces_output));
 
-    // Map the mask back to original face order using scatter
-    // scatter: output[indices[i]] = values[i]
-    // This maps: cu_face_mask_original[original_idx] = cu_face_mask_sorted[sorted_position]
-    uint8_t* cu_face_mask_original;
-    CUDA_CHECK(cudaMalloc(&cu_face_mask_original, F * sizeof(uint8_t)));
-    scatter_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
-        cu_sorted_indices_output,  // indices: sorted_position -> original_idx
-        cu_face_mask_sorted,       // values: mask at sorted_position
-        F,
-        cu_face_mask_original      // output: mask at original position
-    );
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaFree(cu_face_mask_sorted));
-    CUDA_CHECK(cudaFree(cu_sorted_indices_output));
+    // // Map the mask back to original face order using scatter
+    // // scatter: output[indices[i]] = values[i]
+    // // This maps: cu_face_mask_original[original_idx] = cu_face_mask_sorted[sorted_position]
+    // uint8_t* cu_face_mask_original;
+    // CUDA_CHECK(cudaMalloc(&cu_face_mask_original, F * sizeof(uint8_t)));
+    // scatter_kernel<<<(F+BLOCK_SIZE-1)/BLOCK_SIZE, BLOCK_SIZE>>>(
+    //     cu_sorted_indices_output,  // indices: sorted_position -> original_idx
+    //     cu_face_mask_sorted,       // values: mask at sorted_position
+    //     F,
+    //     cu_face_mask_original      // output: mask at original position
+    // );
+    // CUDA_CHECK(cudaGetLastError());
+    // CUDA_CHECK(cudaFree(cu_face_mask_sorted));
+    // CUDA_CHECK(cudaFree(cu_sorted_indices_output));
 
-    // Select faces to keep (preserving original vertex order)
-    this->_remove_faces(cu_face_mask_original);
-    CUDA_CHECK(cudaFree(cu_face_mask_original));
+    // // Select faces to keep (preserving original vertex order)
+    // this->_remove_faces(cu_face_mask_original);
+    // CUDA_CHECK(cudaFree(cu_face_mask_original));
 }
 
 
