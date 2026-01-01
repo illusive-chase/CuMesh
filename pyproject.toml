@@ -18,6 +18,6 @@ authors = [
     { name = "Jianfeng Xiang", email = "belljig@outlook.com" }
 ]
 dependencies = [
-    "torch>=2.4.0",
+    # "torch>=2.4.0",
     "tqdm",
 ]
